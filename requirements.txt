@@ -1,0 +1,26 @@
+# Core AI / Agent
+anthropic>=0.40.0
+
+# YouTube Data API v3
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.0
+
+# Video downloading
+yt-dlp>=2024.1.0
+
+# AI upscaling — Real-ESRGAN and dependencies
+# NOTE: Install PyTorch CUDA before this:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+basicsr>=1.4.2
+facexlib>=0.3.0
+gfpgan>=1.3.8
+realesrgan>=0.3.0
+
+# Computer vision (frame I/O)
+opencv-python-headless>=4.8.0
+
+# Utilities
+numpy>=1.24.0
+tqdm>=4.66.0

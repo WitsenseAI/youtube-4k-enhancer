@@ -1,0 +1,29 @@
+# Secrets
+.env
+client_secrets.json
+youtube_token.json
+
+# Large media directories
+downloads/
+frames/
+enhanced/
+output/
+weights/
+
+# State (commit if you want to persist pipeline progress across machines)
+# state.json
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
