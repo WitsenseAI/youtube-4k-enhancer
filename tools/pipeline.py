@@ -32,7 +32,69 @@ logger = logging.getLogger(__name__)
 state = StateManager()
 
 
-# ── 1. Discover saved videos ───────────────────────────────────────────────────
+# ── 1a. Load videos from a text file ──────────────────────────────────────────
+
+def load_videos_from_file(file_path: str) -> Dict[str, Any]:
+    """
+    Read a plain-text file of YouTube URLs (one per line) and register
+    each as 'pending' in the pipeline.
+
+    Supported URL formats:
+      https://www.youtube.com/watch?v=VIDEO_ID
+      https://youtu.be/VIDEO_ID
+      https://www.youtube.com/shorts/VIDEO_ID
+      VIDEO_ID   (bare 11-char ID)
+
+    Lines starting with # and blank lines are ignored.
+    """
+    import re
+
+    path = Path(file_path)
+    if not path.exists():
+        return {"success": False, "error": f"File not found: {file_path}"}
+
+    pattern = re.compile(
+        r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})"
+        r"|^([A-Za-z0-9_-]{11})$"
+    )
+
+    new_count = 0
+    skipped = 0
+    invalid = []
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        m = pattern.search(line)
+        if not m:
+            invalid.append(line)
+            continue
+
+        video_id = m.group(1) or m.group(2)
+        if state.get_stage(video_id) is None:
+            state.upsert_video(video_id, stage="pending", title=None, channel=None)
+            new_count += 1
+        else:
+            skipped += 1
+
+    return {
+        "success": True,
+        "file": file_path,
+        "new_registered": new_count,
+        "already_known": skipped,
+        "invalid_lines": invalid,
+        "pipeline_summary": state.summary(),
+        "pending_videos": [
+            {"video_id": v["video_id"], "title": v.get("title") or "(title fetched at download)"}
+            for v in state.videos_by_stage("pending")
+        ][:20],
+    }
+
+
+# ── 1b. Discover saved videos ──────────────────────────────────────────────────
 
 def fetch_saved_videos(playlist_id: str = SAVED_PLAYLIST_ID) -> Dict[str, Any]:
     """

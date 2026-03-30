@@ -10,9 +10,10 @@ An agentic pipeline orchestrated by Claude (claude-opus-4-6) that:
   6. Resumes seamlessly after any crash
 
 Usage:
-    python agent.py                  # full run
-    python agent.py --status         # show pipeline status only
-    python agent.py --video VIDEO_ID # process one specific video
+    python agent.py                        # process YouTube Saved/Watch Later playlist
+    python agent.py --urls-file urls.txt   # process URLs from a text file
+    python agent.py --status               # show pipeline status only
+    python agent.py --video VIDEO_ID       # process one specific video
 """
 
 import argparse
@@ -31,6 +32,7 @@ from tools.pipeline import (
     fetch_saved_videos,
     get_next_pending_video,
     get_pipeline_status,
+    load_videos_from_file,
     run_encode_video,
     run_enhance_frames,
     run_extract_frames,
@@ -52,6 +54,26 @@ logger = logging.getLogger("agent")
 # ── Tool definitions (Claude sees these) ──────────────────────────────────────
 
 TOOLS: list[Dict[str, Any]] = [
+    {
+        "name": "load_videos_from_file",
+        "description": (
+            "Read a plain-text file of YouTube URLs (one per line) and register "
+            "each video as 'pending' in the pipeline. "
+            "Accepts full URLs (youtube.com/watch?v=..., youtu.be/..., shorts/...) "
+            "or bare 11-character video IDs. Lines starting with # are treated as comments. "
+            "Call this instead of fetch_saved_videos when the user provides a URL file."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Absolute or relative path to the text file containing YouTube URLs.",
+                }
+            },
+            "required": ["file_path"],
+        },
+    },
     {
         "name": "fetch_saved_videos",
         "description": (
@@ -183,7 +205,9 @@ def execute_tool(name: str, tool_input: Dict[str, Any]) -> str:
     logger.info("Tool call: %s(%s)", name, json.dumps(tool_input))
 
     try:
-        if name == "fetch_saved_videos":
+        if name == "load_videos_from_file":
+            result = load_videos_from_file(tool_input["file_path"])
+        elif name == "fetch_saved_videos":
             result = fetch_saved_videos(tool_input.get("playlist_id", SAVED_PLAYLIST_ID))
         elif name == "get_pipeline_status":
             result = get_pipeline_status()
@@ -304,6 +328,10 @@ def main() -> None:
     parser.add_argument("--status", action="store_true", help="Show pipeline status and exit")
     parser.add_argument("--video", metavar="VIDEO_ID", help="Process one specific video ID")
     parser.add_argument(
+        "--urls-file", metavar="PATH",
+        help="Path to a text file containing YouTube URLs (one per line)",
+    )
+    parser.add_argument(
         "--playlist",
         default=SAVED_PLAYLIST_ID,
         help="YouTube playlist ID to process (default: WL = Watch Later / Saved)",
@@ -320,6 +348,14 @@ def main() -> None:
             f"Process the single video with ID '{args.video}' through the full pipeline: "
             "download → extract frames → enhance frames → encode → upload. "
             "Check its current stage first and resume from where it left off."
+        )
+    elif args.urls_file:
+        prompt = (
+            f"Load videos from the file '{args.urls_file}' using load_videos_from_file, "
+            "then call get_pipeline_status to see what needs work. "
+            "Process each pending (or failed) video through the complete pipeline: "
+            "download → extract_frames → enhance_frames → encode → upload. "
+            "Report progress after each video completes."
         )
     else:
         prompt = (
